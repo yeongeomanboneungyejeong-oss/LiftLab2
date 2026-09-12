@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0d12" />
+  <title>LiftLab 2</title>
+  <style>
+    :root{--bg:#0b0d12;--panel:#121620;--panel2:#181d28;--line:#2a3040;--text:#f4f7fb;--muted:#9aa4b2;--accent:#7c5cff;--good:#22c55e}
+    *{box-sizing:border-box}
+    body{margin:0;background:radial-gradient(circle at top,#171b27 0,#0b0d12 42%);color:var(--text);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    button,input{font:inherit}
+    .app{width:min(100%,760px);margin:0 auto;padding:18px 14px 42px}
+    header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+    .brand{font-size:24px;font-weight:850;letter-spacing:-.04em}.brand span{color:var(--accent)}
+    .badge{font-size:11px;color:#cbd2df;border:1px solid var(--line);border-radius:999px;padding:6px 9px}
+    .panel{background:rgba(18,22,32,.94);border:1px solid var(--line);border-radius:18px;padding:14px;margin-top:12px;box-shadow:0 12px 35px rgba(0,0,0,.18)}
+    .hero h1{font-size:24px;line-height:1.12;margin:3px 0 8px}.hero p{color:var(--muted);font-size:13px;line-height:1.55;margin:0}
+    .upload{margin-top:14px;border:1px dashed #465066;border-radius:15px;padding:18px;text-align:center;background:#0f131b}
+    .upload input{width:100%;font-size:13px;color:var(--muted)}
+    .filename{margin-top:9px;color:#dce2ec;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+    button{border:0;border-radius:13px;padding:13px 12px;font-weight:800;cursor:pointer}
+    .primary{background:var(--accent);color:#fff}.secondary{background:#202633;color:#e9edf5;border:1px solid var(--line)}
+    button:disabled{opacity:.45;cursor:not-allowed}
+    .status{display:flex;gap:9px;align-items:center;font-size:13px}.dot{width:8px;height:8px;border-radius:50%;background:#667085}.dot.good{background:var(--good)}
+    .progress{height:7px;background:#252b37;border-radius:99px;overflow:hidden;margin-top:10px}.bar{height:100%;width:0;background:var(--accent);transition:width .25s}
+    .viewer{position:relative;background:#050609;border-radius:15px;overflow:hidden;aspect-ratio:9/16;max-height:72vh;display:flex;align-items:center;justify-content:center}
+    video{display:block;width:100%;height:100%;object-fit:contain;background:#050609}
+    #overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+    .viewer-tools{display:flex;gap:8px;align-items:center;margin-top:9px}.viewer-tools label{font-size:12px;color:var(--muted)}
+    input[type=range]{accent-color:var(--accent);width:100%}
+    .time{font-variant-numeric:tabular-nums;font-size:12px;color:#c8ced8;white-space:nowrap}
+    .legend{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:10px}
+    .legend-item{display:flex;align-items:center;gap:6px;font-size:11px;color:#c6ccd6}.swatch{width:9px;height:9px;border-radius:50%;flex:none}
+    .angles{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px}.angle{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px}.angle .n{font-size:11px;color:var(--muted)}.angle .v{font-size:21px;font-weight:850;margin-top:3px}.angle .v small{font-size:12px;color:var(--muted);font-weight:500}
+    .chart-wrap{height:190px;background:#0d1118;border:1px solid var(--line);border-radius:13px;position:relative;overflow:hidden}.chart-wrap canvas{width:100%;height:100%}
+    .section-title{font-size:14px;font-weight:800;margin-bottom:9px}.sub{font-size:11px;color:var(--muted);font-weight:500}
+    .download-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.hidden{display:none!important}
+    .notice{font-size:11px;line-height:1.5;color:var(--muted);margin-top:9px}
+    @media(max-width:420px){.legend{grid-template-columns:repeat(2,1fr)}}
+  </style>
+</head>
+<body>
+<div class="app">
+  <header><div class="brand">LiftLab <span>2</span></div><div class="badge">YOLO Pose · CPU optimized</div></header>
+
+  <section class="panel hero">
+    <h1>움직임을 프레임 단위로 분석</h1>
+    <p>운동 영상을 업로드하면 사람 포즈, 분절별 움직임, 관절각을 분석합니다. 바벨 추적은 포함하지 않습니다.</p>
+    <div class="upload">
+      <input id="file" type="file" accept="video/*" />
+      <div id="filename" class="filename">영상이 선택되지 않았습니다.</div>
+    </div>
+    <div class="actions">
+      <button id="start" class="primary" disabled>영상 분석 시작</button>
+      <button id="reset" class="secondary">초기화</button>
+    </div>
+    <div class="panel" style="margin-top:10px;padding:11px;background:#0f131b">
+      <div class="status"><span id="dot" class="dot"></span><span id="statusText">영상 선택 후 분석을 시작하세요.</span></div>
+      <div class="progress"><div id="progressBar" class="bar"></div></div>
+    </div>
+  </section>
+
+  <section id="resultSection" class="hidden">
+    <div class="panel">
+      <div class="viewer"><video id="video" playsinline controls></video><canvas id="overlay"></canvas></div>
+      <div class="viewer-tools"><input id="seek" type="range" min="0" max="1" step="0.001" value="0"/><span id="time" class="time">0:00 / 0:00</span></div>
+      <div id="legend" class="legend"></div>
+    </div>
+
+    <div class="panel">
+      <div class="section-title">현재 관절각 <span class="sub">영상 위치와 동기화</span></div>
+      <div id="angles" class="angles"></div>
+    </div>
+
+    <div class="panel">
+      <div class="section-title">관절각 변화 <span class="sub">샘플 분석 프레임</span></div>
+      <div class="chart-wrap"><canvas id="chart"></canvas></div>
+    </div>
+
+    <div class="panel">
+      <div class="section-title">결과 다운로드</div>
+      <div class="download-grid">
+        <button id="downloadJson" class="primary">JSON 다운로드</button>
+        <button id="downloadCsv" class="secondary">CSV 다운로드</button>
+      </div>
+      <div class="notice">원본 영상은 서버 분석이 끝난 뒤 삭제됩니다. 다운로드 파일에는 포즈 좌표와 관절각 데이터가 포함됩니다.</div>
+    </div>
+  </section>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const file = $('file'), start = $('start'), reset = $('reset');
+const video = $('video'), overlay = $('overlay'), ctx = overlay.getContext('2d');
+const seek = $('seek'), timeEl = $('time'), statusText = $('statusText'), progressBar = $('progressBar'), dot = $('dot');
+const anglesEl = $('angles'), legendEl = $('legend'), chart = $('chart'), cctx = chart.getContext('2d');
+let result = null, jobId = null, pollTimer = null, videoUrl = null;
+
+const angleLabels = {
+  left_elbow:'왼쪽 팔꿈치', right_elbow:'오른쪽 팔꿈치',
+  left_shoulder:'왼쪽 어깨', right_shoulder:'오른쪽 어깨',
+  left_hip:'왼쪽 고관절', right_hip:'오른쪽 고관절',
+  left_knee:'왼쪽 무릎', right_knee:'오른쪽 무릎'
+};
+
+function setStatus(text, progress=0, good=false){ statusText.textContent=text; progressBar.style.width=`${progress}%`; dot.classList.toggle('good',good); }
+function fmt(t){ t=Math.max(0,t||0); const m=Math.floor(t/60), s=Math.floor(t%60).toString().padStart(2,'0'); return `${m}:${s}`; }
+
+file.addEventListener('change',()=>{
+  const f=file.files[0];
+  start.disabled=!f;
+  $('filename').textContent=f?`${f.name} · ${(f.size/1024/1024).toFixed(1)} MB`:'영상이 선택되지 않았습니다.';
+  setStatus(f?'영상 준비 완료 · 분석을 시작하세요.':'영상 선택 후 분석을 시작하세요.',0,false);
+});
+
+start.addEventListener('click', async()=>{
+  const f=file.files[0]; if(!f) return;
+  start.disabled=true; setStatus('영상 업로드 중…',0,false);
+  const fd=new FormData(); fd.append('file',f);
+  try{
+    const r=await fetch('/api/analyze',{method:'POST',body:fd});
+    if(!r.ok) throw new Error(await r.text());
+    const j=await r.json(); jobId=j.job_id; poll();
+  }catch(e){ start.disabled=false; setStatus('업로드 실패: '+e.message,0,false); }
+});
+
+async function poll(){
+  clearTimeout(pollTimer);
+  try{
+    const r=await fetch(`/api/status/${jobId}`); const j=await r.json();
+    setStatus(j.message||j.status, j.progress||0, j.status==='completed');
+    if(j.status==='completed') return loadResult();
+    if(j.status==='error'){ start.disabled=false; return; }
+    pollTimer=setTimeout(poll,1000);
+  }catch(e){ pollTimer=setTimeout(poll,2000); }
+}
+
+async function loadResult(){
+  const r=await fetch(`/api/result/${jobId}`); result=await r.json();
+  if(videoUrl) URL.revokeObjectURL(videoUrl);
+  videoUrl=URL.createObjectURL(file.files[0]); video.src=videoUrl; video.load();
+  $('resultSection').classList.remove('hidden');
+  renderLegend(); renderAngles(); resizeCanvases(); drawAll();
+  setStatus(`분석 완료 · ${result.frames.length}개 프레임 샘플`,100,true);
+}
+
+function renderLegend(){
+  legendEl.innerHTML='';
+  for(const [key,s] of Object.entries(result.segments)){
+    const el=document.createElement('div'); el.className='legend-item';
+    el.innerHTML=`<span class="swatch" style="background:${s.color}"></span>${s.label}`; legendEl.appendChild(el);
+  }
+}
+
+function nearestFrames(frameNo){
+  const frames=result.frames; if(!frames.length) return [frames[0],frames[0],0];
+  let lo=0,hi=frames.length-1;
+  if(frameNo<=frames[0].frame) return [frames[0],frames[0],0];
+  if(frameNo>=frames[hi].frame) return [frames[hi],frames[hi],0];
+  while(lo<=hi){ const mid=(lo+hi)>>1; if(frames[mid].frame<frameNo) lo=mid+1; else hi=mid-1; }
+  const b=frames[lo], a=frames[lo-1]; const t=(frameNo-a.frame)/Math.max(1,b.frame-a.frame); return [a,b,t];
+}
+function interpPoint(a,b,t){
+  if(!a&&!b)return null; if(!a)return b; if(!b)return a; return [a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];
+}
+function currentData(){
+  if(!result) return null; const frame=Math.round((video.currentTime||0)*result.fps); const [a,b,t]=nearestFrames(frame);
+  const joints=a.joints.map((p,i)=>interpPoint(p,b.joints[i],t));
+  const angles={}; for(const k of Object.keys(angleLabels)){ const av=a.angles[k],bv=b.angles[k]; angles[k]=(av==null&&bv==null)?null:(av==null?bv:(bv==null?av:av+(bv-av)*t)); }
+  return {frame,joints,angles};
+}
+
+function resizeCanvases(){
+  const rect=overlay.getBoundingClientRect(); const dpr=Math.min(window.devicePixelRatio||1,2);
+  overlay.width=Math.max(1,Math.round(rect.width*dpr)); overlay.height=Math.max(1,Math.round(rect.height*dpr));
+  const cr=chart.getBoundingClientRect(); chart.width=Math.max(1,Math.round(cr.width*dpr)); chart.height=Math.max(1,Math.round(cr.height*dpr));
+}
+function mapPoint(p){
+  if(!p||!result) return null;
+  const vw=video.videoWidth||result.width, vh=video.videoHeight||result.height;
+  const cw=overlay.width, ch=overlay.height;
+  const scale=Math.min(cw/vw,ch/vh), ox=(cw-vw*scale)/2, oy=(ch-vh*scale)/2;
+  return [ox+p[0]*scale,oy+p[1]*scale];
+}
+function drawAll(){
+  if(!result)return;
+  const d=currentData(); ctx.clearRect(0,0,overlay.width,overlay.height);
+  // Draw a subtle movement trail for each segment using the sampled analysis frames.
+  const trailSets={}; for(const key of Object.keys(result.segments)) trailSets[key]=[];
+  for(const fr of result.frames){
+    for(const [key,s] of Object.entries(result.segments)){
+      const pts=[]; const ids=[...new Set(s.edges.flat())]; for(const id of ids) if(fr.joints[id]) pts.push(mapPoint(fr.joints[id]));
+      if(pts.length) trailSets[key].push(pts);
+    }
+  }
+  for(const [key,s] of Object.entries(result.segments)){
+    ctx.globalAlpha=.16; ctx.strokeStyle=s.color; ctx.lineWidth=Math.max(2,overlay.width/220); ctx.lineCap='round';
+    const pts=trailSets[key].flat(); if(pts.length>1){ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.stroke();}
+    ctx.globalAlpha=1;
+    for(const edge of s.edges){ const a=mapPoint(d.joints[edge[0]]),b=mapPoint(d.joints[edge[1]]); if(!a||!b)continue; ctx.strokeStyle=s.color;ctx.lineWidth=Math.max(4,overlay.width/150);ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke(); }
+  }
+  d.joints.forEach((p,i)=>{const q=mapPoint(p);if(!q)return;ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(q[0],q[1],Math.max(3,overlay.width/95),0,Math.PI*2);ctx.fill();});
+  renderAngles(d.angles);
+  drawChart(frameIndex());
+  updateTime();
+}
+function frameIndex(){ return Math.round((video.currentTime||0)*result.fps); }
+function renderAngles(values){
+  const data=values||currentData()?.angles||{}; anglesEl.innerHTML='';
+  for(const key of Object.keys(angleLabels)){const v=data[key];const el=document.createElement('div');el.className='angle';el.innerHTML=`<div class="n">${angleLabels[key]}</div><div class="v">${v==null?'—':v.toFixed(1)} <small>°</small></div>`;anglesEl.appendChild(el);}
+}
+function updateTime(){ if(!result)return; seek.max=video.duration||result.duration; seek.value=video.currentTime||0; timeEl.textContent=`${fmt(video.currentTime)} / ${fmt(video.duration||result.duration)}`; }
+function drawChart(currentFrame){
+  if(!result)return; const w=chart.width,h=chart.height; cctx.clearRect(0,0,w,h); cctx.fillStyle='#0d1118';cctx.fillRect(0,0,w,h);
+  const keys=['left_knee','right_knee','left_hip','right_hip']; const pad={l:28,r:8,t:12,b:22};
+  cctx.strokeStyle='#273040';cctx.lineWidth=1; for(let i=0;i<5;i++){const y=pad.t+(h-pad.t-pad.b)*i/4;cctx.beginPath();cctx.moveTo(pad.l,y);cctx.lineTo(w-pad.r,y);cctx.stroke();}
+  const yScale=v=>pad.t+(180-v)/180*(h-pad.t-pad.b); const xScale=f=>pad.l+f/(result.frame_count-1)*(w-pad.l-pad.r);
+  keys.forEach((key,ki)=>{cctx.strokeStyle=result.segments[ki<2?'left_leg':'right_leg'].color;cctx.lineWidth=2;cctx.beginPath();let started=false;for(const fr of result.frames){const v=fr.angles[key];if(v==null){started=false;continue;}const x=xScale(fr.frame),y=yScale(v);if(!started){cctx.moveTo(x,y);started=true}else cctx.lineTo(x,y);}cctx.stroke();});
+  const x=xScale(Math.max(0,Math.min(result.frame_count-1,currentFrame)));cctx.strokeStyle='#fff';cctx.globalAlpha=.75;cctx.beginPath();cctx.moveTo(x,pad.t);cctx.lineTo(x,h-pad.b);cctx.stroke();cctx.globalAlpha=1;
+  cctx.fillStyle='#7f8998';cctx.font=`${Math.max(9,w/65)}px system-ui`;cctx.fillText('180°',3,pad.t+4);cctx.fillText('90°',7,(h-pad.b+pad.t)/2);cctx.fillText('0°',10,h-pad.b);
+}
+
+video.addEventListener('loadedmetadata',()=>{seek.max=video.duration||1;resizeCanvases();drawAll();});
+video.addEventListener('timeupdate',()=>{drawAll();});
+video.addEventListener('seeking',drawAll);
+seek.addEventListener('input',()=>{video.currentTime=Number(seek.value);drawAll();});
+window.addEventListener('resize',()=>{resizeCanvases();drawAll();});
+
+$('downloadJson').addEventListener('click',()=>downloadBlob(JSON.stringify(result,null,2),'application/json','liftlab2_result.json'));
+$('downloadCsv').addEventListener('click',()=>{
+  const header=['frame','time',...Object.keys(angleLabels),...result.keypoint_names.flatMap(n=>[`${n}_x`,`${n}_y`])];
+  const rows=[header]; for(const fr of result.frames){const row=[fr.frame,fr.time,...Object.keys(angleLabels).map(k=>fr.angles[k]??'')];for(const p of fr.joints)row.push(p?p[0]:'',p?p[1]:'');rows.push(row);} 
+  const csv='\ufeff'+rows.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(',')).join('\n'); downloadBlob(csv,'text/csv','liftlab2_result.csv');
+});
+function downloadBlob(content,type,name){const blob=new Blob([content],{type});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
+
+reset.addEventListener('click',()=>{clearTimeout(pollTimer);jobId=null;result=null;file.value='';start.disabled=true;video.pause();video.removeAttribute('src');video.load();if(videoUrl)URL.revokeObjectURL(videoUrl);videoUrl=null;$('filename').textContent='영상이 선택되지 않았습니다.';$('resultSection').classList.add('hidden');setStatus('영상 선택 후 분석을 시작하세요.',0,false);ctx.clearRect(0,0,overlay.width,overlay.height);});
+</script>
+</body>
+</html>
